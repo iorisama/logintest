@@ -6,10 +6,57 @@
     <title>cebirraverse</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style type="text/css">
+      /* The Modal (background) */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 1; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+  background-color: rgb(0,0,0); /* Fallback color */
+  background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+/* Modal Content/Box */
+.modal-content {
+  background-color: #fefefe;
+  margin: 15% auto; /* 15% from the top and centered */
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%; /* Could be more or less, depending on screen size */
+}
+
+/* The Close Button */
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+    </style>
   </head>
   <body class="dark">
-    <button id="loginIt" onclick="loginGoogle()" style="display:none;"></button>
+    
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+      <!-- Modal content -->
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <button id="googleBtn">Login Via Google</button>
+      </div>
+
+    </div>
     <div id="unity-container" class="unity-desktop">
       <canvas id="unity-canvas"></canvas>
       <div id="unity-custom-loading-screen">
@@ -55,11 +102,11 @@
 
       var hideFullScreenButton = "";
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/world.loader.js";
+      var loaderUrl = buildUrl + "/world2.loader.js";
       var config = {
-        dataUrl: buildUrl + "/world.data",
-        frameworkUrl: buildUrl + "/world.framework.js",
-        codeUrl: buildUrl + "/world.wasm",
+        dataUrl: buildUrl + "/world2.data",
+        frameworkUrl: buildUrl + "/world2.framework.js",
+        codeUrl: buildUrl + "/world2.wasm",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Cebirra",
         productName: "cebirraverse",
@@ -114,10 +161,14 @@
           alert(message);
         });
       };      
-      document.body.appendChild(script);      
+      document.body.appendChild(script);     
+      //Login Modal
+      function Logon(){
+        mods();
+      } 
       //Save Data User
-      function SaveData(userId,dataHat,playerColor){
-        writeUserData(userId,dataHat,playerColor);
+      function SaveData(userId,playerColor){
+        writeUserData(userId,playerColor);
       }    
       //Get Data From Login UI
       function ReadingData(){
@@ -125,11 +176,6 @@
         myGameInstance.SendMessage('DataManager', 'GetName', localStorage.getItem("user"));
         localStorage.clear();
       }
-
-      function Logon(){
-        document.getElementById("loginIt").click();
-      }
-
       // value - 0 to 1
       function unitySetLoaderProgressTo(value)
       {
@@ -153,9 +199,7 @@
       // Import the functions you need from the SDKs you need
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-analytics.js";
-      import { getDatabase, set, ref, push, child } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-database.js";
       import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signInWithPopup} from "https://www.gstatic.com/firebasejs/9.13.0/firebase-auth.js";
-      
       // TODO: Add SDKs for Firebase products that you want to use
       // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -178,19 +222,8 @@
       const provider = new GoogleAuthProvider(app);
       const auth = getAuth(app);
 
-      const database = getDatabase(app);
-      
-      /*const userId = push(child(ref(database),'users')).key;*/
+      googleBtn.addEventListener('click', (e) => {
 
-      window.writeUserData = function (userId, dataHat, playerColor) {        
-        set(ref(database, 'users/' + userId), {
-          dataHat: dataHat,
-          colorChar: playerColor
-        });
-        alert('saved');
-      }
-
-      window.loginGoogle = function(){
         signInWithPopup(auth, provider)
         .then((result) => {
           // This gives you a Google Access Token. You can use it to access the Google API.
@@ -202,7 +235,8 @@
           //alert(user.displayName);
           localStorage.setItem('user', user.displayName);
           localStorage.setItem('uid', user.uid);
-          
+          closemods();
+          ReadingData();
           // ...
         }).catch((error) => {
           // Handle Errors here.
@@ -215,6 +249,25 @@
           // ...
           alert(errorMessage);
         });
+      });
+
+            // Get the modal
+      var modal = document.getElementById("myModal");
+
+      // Get the button that opens the modal
+      var btn = document.getElementById("myBtn");
+
+      // Get the <span> element that closes the modal
+      var span = document.getElementsByClassName("close")[0];
+
+      // When the user clicks on the button, open the modal
+      window.mods = function() {
+        modal.style.display = "block";
+      }
+
+      // When the user clicks on <span> (x), close the modal
+      window.closemods = function() {
+        modal.style.display = "none";
       }
 
     </script>
