@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>cebirraverse</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  </head>
+  <body class="dark">
+    <button id="loginIt" onclick="loginGoogle()" style="display:none;"></button>
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas"></canvas>
+      <div id="unity-custom-loading-screen">
+        <div id="custom-logo"></div>
+        <div id="custom-loader">
+          <div class="fill"></div>
+          <div class="label"></div>
+        </div>
+      </div>      
+    </div>
+    <div id="unity-fullscreen-button" style="display: none;"></div>
+    <script>
+      var container = document.querySelector("#unity-container");
+      var canvas = document.querySelector("#unity-canvas");
+      var loadingScreen = document.querySelector("#unity-custom-loading-screen");
+      var customLoadingBar = document.querySelector("#custom-loader");
+      var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+      var warningBanner = document.querySelector("#unity-warning");;
+
+      // Shows a temporary message banner/ribbon for a few seconds, or
+      // a permanent error message on top of the canvas if type=='error'.
+      // If type=='warning', a yellow highlight color is used.
+      // Modify or remove this function to customize the visually presented
+      // way that non-critical warnings and error messages are presented to the
+      // user.
+      function unityShowBanner(msg, type) {
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      var hideFullScreenButton = "";
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/world.loader.js";
+      var config = {
+        dataUrl: buildUrl + "/world.data",
+        frameworkUrl: buildUrl + "/world.framework.js",
+        codeUrl: buildUrl + "/world.wasm",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "Cebirra",
+        productName: "cebirraverse",
+        productVersion: "0.1",
+      };
+
+      // By default Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
+      var canFullscreen = (function() {
+        for (var key of [
+            'exitFullscreen',
+            'webkitExitFullscreen',
+            'webkitCancelFullScreen',
+            'mozCancelFullScreen',
+            'msExitFullscreen',
+          ]) {
+          if (key in document) {
+            return true;
+          }
+        }
+        return false;
+      }());
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        container.className = "unity-mobile";
+        config.devicePixelRatio = 1;
+      }
+      loadingScreen.style.display = "";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      var myGameInstance = null;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          unitySetLoaderProgressTo(progress);
+        }).then((unityInstance) => {
+          loadingScreen.style.display = "none";
+          myGameInstance = unityInstance;
+          if (canFullscreen) {
+            if (!hideFullScreenButton) {
+              fullscreenButton.style.display = "";
+            }
+            fullscreenButton.onclick = () => {
+              unityInstance.SetFullscreen(1);
+            };
+          }
+        }).catch((message) => {
+          alert(message);
+        });
+      };      
+      document.body.appendChild(script);      
+      //Save Data User
+      function SaveData(userId,dataHat,playerColor){
+        writeUserData(userId,dataHat,playerColor);
+      }    
+      //Get Data From Login UI
+      function ReadingData(){
+        myGameInstance.SendMessage('DataManager', 'GetUID', localStorage.getItem("uid"));
+        myGameInstance.SendMessage('DataManager', 'GetName', localStorage.getItem("user"));
+        localStorage.clear();
+      }
+
+      function Logon(){
+        document.getElementById("loginIt").click();
+      }
+
+      // value - 0 to 1
+      function unitySetLoaderProgressTo(value)
+      {
+        const fill = customLoadingBar.getElementsByClassName("fill")[0];
+        const fillText = customLoadingBar.getElementsByClassName("label")[0];
+
+        fill.animate(
+          [
+            { width: (value * 100) + "%" }
+          ],
+          {
+            duration: 300,
+            fill: "forwards"
+          }
+        );
+
+        fillText.textContent = (value * 100).toFixed() + "%";
+      }
+    </script>
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-analytics.js";
+      import { getDatabase, set, ref, push, child } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-database.js";
+      import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signInWithPopup} from "https://www.gstatic.com/firebasejs/9.13.0/firebase-auth.js";
+      
+      // TODO: Add SDKs for Firebase products that you want to use
+      // https://firebase.google.com/docs/web/setup#available-libraries
+
+      // Your web app's Firebase configuration
+      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+      const firebaseConfig = {
+        apiKey: "AIzaSyCEhBo8GFP9b63_QbP1HgPflfp1UADEHLE",
+        authDomain: "cebirraverse.firebaseapp.com",
+        databaseURL: "https://cebirraverse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "cebirraverse",
+        storageBucket: "cebirraverse.appspot.com",
+        messagingSenderId: "74765814981",
+        appId: "1:74765814981:web:1dc09a31790b58268a74ac",
+        measurementId: "G-NBQQ0M9F3Y"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+      const provider = new GoogleAuthProvider(app);
+      const auth = getAuth(app);
+
+      const database = getDatabase(app);
+      
+      /*const userId = push(child(ref(database),'users')).key;*/
+
+      window.writeUserData = function (userId, dataHat, playerColor) {        
+        set(ref(database, 'users/' + userId), {
+          dataHat: dataHat,
+          colorChar: playerColor
+        });
+        alert('saved');
+      }
+
+      window.loginGoogle = function(){
+        signInWithPopup(auth, provider)
+        .then((result) => {
+          // This gives you a Google Access Token. You can use it to access the Google API.
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          const token = credential.accessToken;
+          // The signed-in user info.
+          const user = result.user;
+
+          //alert(user.displayName);
+          localStorage.setItem('user', user.displayName);
+          localStorage.setItem('uid', user.uid);
+          
+          // ...
+        }).catch((error) => {
+          // Handle Errors here.
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          // The email of the user's account used.
+          const email = error.customData.email;
+          // The AuthCredential type that was used.
+          const credential = GoogleAuthProvider.credentialFromError(error);
+          // ...
+          alert(errorMessage);
+        });
+      }
+
+    </script>
+   
+  </body>
+</html>
