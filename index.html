@@ -3,78 +3,33 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>cebirraverse</title>
+    <title>Unity WebGL Player | TestSys</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
-    <style type="text/css">
-      /* The Modal (background) */
-.modal {
-  display: none; /* Hidden by default */
-  position: fixed; /* Stay in place */
-  z-index: 1; /* Sit on top */
-  left: 0;
-  top: 0;
-  width: 100%; /* Full width */
-  height: 100%; /* Full height */
-  overflow: auto; /* Enable scroll if needed */
-  background-color: rgb(0,0,0); /* Fallback color */
-  background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-}
-
-/* Modal Content/Box */
-.modal-content {
-  background-color: #fefefe;
-  margin: 15% auto; /* 15% from the top and centered */
-  padding: 20px;
-  border: 1px solid #888;
-  width: 80%; /* Could be more or less, depending on screen size */
-}
-
-/* The Close Button */
-.close {
-  color: #aaa;
-  float: right;
-  font-size: 28px;
-  font-weight: bold;
-}
-
-.close:hover,
-.close:focus {
-  color: black;
-  text-decoration: none;
-  cursor: pointer;
-}
-    </style>
   </head>
-  <body class="dark">
-    
-    <!-- The Modal -->
-    <div id="myModal" class="modal">
-      <!-- Modal content -->
-      <div class="modal-content">
-        <span class="close">&times;</span>
-        <button id="googleBtn">Login Via Google</button>
-      </div>
-
-    </div>
+  <body>
     <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas"></canvas>
-      <div id="unity-custom-loading-screen">
-        <div id="custom-logo"></div>
-        <div id="custom-loader">
-          <div class="fill"></div>
-          <div class="label"></div>
+      <canvas id="unity-canvas" width=960 height=600></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
         </div>
-      </div>      
+      </div>
+      <div id="unity-warning"> </div>
+      <div id="unity-footer">
+        <div id="unity-webgl-logo"></div>
+        <div id="unity-fullscreen-button"></div>
+        <div id="unity-build-title">TestSys</div>
+      </div>
     </div>
-    <div id="unity-fullscreen-button" style="display: none;"></div>
     <script>
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
-      var loadingScreen = document.querySelector("#unity-custom-loading-screen");
-      var customLoadingBar = document.querySelector("#custom-loader");
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarFull = document.querySelector("#unity-progress-bar-full");
       var fullscreenButton = document.querySelector("#unity-fullscreen-button");
-      var warningBanner = document.querySelector("#unity-warning");;
+      var warningBanner = document.querySelector("#unity-warning");
 
       // Shows a temporary message banner/ribbon for a few seconds, or
       // a permanent error message on top of the canvas if type=='error'.
@@ -100,17 +55,17 @@
         updateBannerVisibility();
       }
 
-      var hideFullScreenButton = "";
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/world2.loader.js";
+      var loaderUrl = buildUrl + "/testsys.loader.js";
       var config = {
-        dataUrl: buildUrl + "/world2.data",
-        frameworkUrl: buildUrl + "/world2.framework.js",
-        codeUrl: buildUrl + "/world2.wasm",
+        dataUrl: buildUrl + "/testsys.data",
+        frameworkUrl: buildUrl + "/testsys.framework.js",
+        codeUrl: buildUrl + "/testsys.wasm",
         streamingAssetsUrl: "StreamingAssets",
-        companyName: "Cebirra",
-        productName: "cebirraverse",
+        companyName: "DefaultCompany",
+        productName: "TestSys",
         productVersion: "0.1",
+        showBanner: unityShowBanner,
       };
 
       // By default Unity keeps WebGL canvas render target size matched with
@@ -119,158 +74,34 @@
       // happening inside the engine, and you would instead like to size up
       // the canvas DOM size and WebGL render target sizes yourself.
       // config.matchWebGLToCanvasSize = false;
-      var canFullscreen = (function() {
-        for (var key of [
-            'exitFullscreen',
-            'webkitExitFullscreen',
-            'webkitCancelFullScreen',
-            'mozCancelFullScreen',
-            'msExitFullscreen',
-          ]) {
-          if (key in document) {
-            return true;
-          }
-        }
-        return false;
-      }());
 
       if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
         container.className = "unity-mobile";
+        // Avoid draining fillrate performance on mobile devices,
+        // and default/override low DPI mode on mobile browsers.
         config.devicePixelRatio = 1;
+        unityShowBanner('WebGL builds are not supported on mobile devices.');
+      } else {
+        canvas.style.width = "960px";
+        canvas.style.height = "600px";
       }
-      loadingScreen.style.display = "";
+      loadingBar.style.display = "block";
 
       var script = document.createElement("script");
       script.src = loaderUrl;
-      var myGameInstance = null;
       script.onload = () => {
         createUnityInstance(canvas, config, (progress) => {
-          unitySetLoaderProgressTo(progress);
+          progressBarFull.style.width = 100 * progress + "%";
         }).then((unityInstance) => {
-          loadingScreen.style.display = "none";
-          myGameInstance = unityInstance;
-          if (canFullscreen) {
-            if (!hideFullScreenButton) {
-              fullscreenButton.style.display = "";
-            }
-            fullscreenButton.onclick = () => {
-              unityInstance.SetFullscreen(1);
-            };
-          }
+          loadingBar.style.display = "none";
+          fullscreenButton.onclick = () => {
+            unityInstance.SetFullscreen(1);
+          };
         }).catch((message) => {
           alert(message);
         });
-      };      
-      document.body.appendChild(script);     
-      //Login Modal
-      function Logon(){
-        mods();
-      } 
-      //Save Data User
-      function SaveData(userId,playerColor){
-        writeUserData(userId,playerColor);
-      }    
-      //Get Data From Login UI
-      function ReadingData(){
-        myGameInstance.SendMessage('DataManager', 'GetUID', localStorage.getItem("uid"));
-        myGameInstance.SendMessage('DataManager', 'GetName', localStorage.getItem("user"));
-        localStorage.clear();
-      }
-      // value - 0 to 1
-      function unitySetLoaderProgressTo(value)
-      {
-        const fill = customLoadingBar.getElementsByClassName("fill")[0];
-        const fillText = customLoadingBar.getElementsByClassName("label")[0];
-
-        fill.animate(
-          [
-            { width: (value * 100) + "%" }
-          ],
-          {
-            duration: 300,
-            fill: "forwards"
-          }
-        );
-
-        fillText.textContent = (value * 100).toFixed() + "%";
-      }
-    </script>
-    <script type="module">
-      // Import the functions you need from the SDKs you need
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-app.js";
-      import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.13.0/firebase-analytics.js";
-      import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signInWithPopup} from "https://www.gstatic.com/firebasejs/9.13.0/firebase-auth.js";
-      // TODO: Add SDKs for Firebase products that you want to use
-      // https://firebase.google.com/docs/web/setup#available-libraries
-
-      // Your web app's Firebase configuration
-      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-      const firebaseConfig = {
-        apiKey: "AIzaSyCEhBo8GFP9b63_QbP1HgPflfp1UADEHLE",
-        authDomain: "cebirraverse.firebaseapp.com",
-        databaseURL: "https://cebirraverse-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "cebirraverse",
-        storageBucket: "cebirraverse.appspot.com",
-        messagingSenderId: "74765814981",
-        appId: "1:74765814981:web:1dc09a31790b58268a74ac",
-        measurementId: "G-NBQQ0M9F3Y"
       };
-
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const analytics = getAnalytics(app);
-      const provider = new GoogleAuthProvider(app);
-      const auth = getAuth(app);
-
-      googleBtn.addEventListener('click', (e) => {
-
-        signInWithPopup(auth, provider)
-        .then((result) => {
-          // This gives you a Google Access Token. You can use it to access the Google API.
-          const credential = GoogleAuthProvider.credentialFromResult(result);
-          const token = credential.accessToken;
-          // The signed-in user info.
-          const user = result.user;
-
-          //alert(user.displayName);
-          localStorage.setItem('user', user.displayName);
-          localStorage.setItem('uid', user.uid);
-          closemods();
-          ReadingData();
-          // ...
-        }).catch((error) => {
-          // Handle Errors here.
-          const errorCode = error.code;
-          const errorMessage = error.message;
-          // The email of the user's account used.
-          const email = error.customData.email;
-          // The AuthCredential type that was used.
-          const credential = GoogleAuthProvider.credentialFromError(error);
-          // ...
-          alert(errorMessage);
-        });
-      });
-
-            // Get the modal
-      var modal = document.getElementById("myModal");
-
-      // Get the button that opens the modal
-      var btn = document.getElementById("myBtn");
-
-      // Get the <span> element that closes the modal
-      var span = document.getElementsByClassName("close")[0];
-
-      // When the user clicks on the button, open the modal
-      window.mods = function() {
-        modal.style.display = "block";
-      }
-
-      // When the user clicks on <span> (x), close the modal
-      window.closemods = function() {
-        modal.style.display = "none";
-      }
-
+      document.body.appendChild(script);
     </script>
-   
   </body>
 </html>
