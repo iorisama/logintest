@@ -3,287 +3,456 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HandTouch — Camera Hand Tracking Interactive Screen</title>
+  <title>Interactive Hand-Tracked Art</title>
   <style>
-    :root{
-      --bg:#0b0d10; --panel:#10141a; --ink:#e9eef6; --muted:#8ea1b8; --accent:#78e3ff; --accent2:#b6ff7d;
-      --card:#0f141a; --border:#1c2533; --shadow:0 10px 30px rgba(0,0,0,.35);
+    :root {
+      --bg: #0b0f14;
+      --panel: #121923;
+      --ink: #e6f0ff;
+      --muted: #7c8aa0;
+      --accent: #6aa6ff;
+      --ok: #4ade80;
+      --warn: #f59e0b;
+      --err: #ef4444;
     }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0; background:linear-gradient(180deg,var(--bg),#0e1217); color:var(--ink); font:14px/1.4 system-ui, -apple-system, Segoe UI, Inter, Roboto, sans-serif}
 
-    .wrap{display:grid; grid-template-rows:auto 1fr auto; height:100vh}
-    header{display:flex; align-items:center; gap:.6rem; padding:.55rem .8rem; background:rgba(0,0,0,.28); border-bottom:1px solid var(--border); backdrop-filter:saturate(1.2) blur(6px)}
-    header h1{margin:0; font-size:14px; font-weight:650; letter-spacing:.3px}
-    .pill{padding:.18rem .55rem; border:1px solid var(--border); border-radius:999px; color:var(--muted)}
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 600px at 70% -10%, #162232 0%, var(--bg) 60%);
+      color: var(--ink);
+      font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
 
-    .stage{position:relative; display:grid; place-items:center; overflow:hidden}
-    video, canvas{position:absolute; inset:0; width:100%; height:100%}
-    video{object-fit:cover; filter:brightness(.96) contrast(1.05) saturate(1.05)}
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      backdrop-filter: blur(8px);
+      background: color-mix(in oklab, var(--panel) 86%, #000 14%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .controls {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls label { color: var(--muted); font-size: 13px; }
+    .controls select, .controls input[type="range"], .controls button {
+      background: #0f1520;
+      border: 1px solid #243244;
+      color: var(--ink);
+      padding: 8px 10px;
+      border-radius: 12px;
+      outline: none;
+    }
+    .controls input[type="range"]{ height: 32px; }
+    .controls button {
+      cursor: pointer;
+      transition: transform 0.05s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+    .controls button:hover { border-color: #31507a; }
+    .controls button:active { transform: translateY(1px) scale(0.99); }
 
-    .toolbar{position:absolute; left:12px; top:12px; display:flex; gap:8px; flex-wrap:wrap; background:var(--panel); border:1px solid var(--border); padding:10px; border-radius:14px; box-shadow:var(--shadow)}
-    .btn{appearance:none; border:1px solid var(--border); background:#131923; color:#d9e3f1; padding:8px 10px; border-radius:10px; cursor:pointer; transition:transform .08s ease, background .15s ease, border .15s ease}
-    .btn:hover{transform:translateY(-1px)}
-    .btn[aria-pressed="true"]{background:#172236; border-color:#26344b}
-    .row{display:flex; gap:8px; align-items:center}
-    .legend{position:absolute; right:12px; bottom:12px; background:var(--panel); border:1px solid var(--border); padding:10px 12px; border-radius:12px; color:#c7cfdb; max-width:min(420px, 56vw); box-shadow:var(--shadow)}
-    .legend b{color:#eaf1ff}
-    .hidden{display:none}
+    .wrap {
+      position: relative;
+      min-height: 0;
+      height: calc(100vh - 120px);
+      display: grid;
+      grid-template-columns: 1fr min(28vw, 360px);
+      gap: 12px;
+      padding: 12px;
+    }
 
-    footer{display:flex; justify-content:space-between; align-items:center; padding:.5rem .8rem; color:#97a3b7; background:rgba(0,0,0,.25); border-top:1px solid var(--border)}
+    canvas#art {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: radial-gradient(800px 500px at 50% 40%, #0d1522, #0a0e14);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.38) inset, 0 6px 18px rgba(0,0,0,0.3);
+    }
+
+    .side {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+    }
+    .panel {
+      background: #0e141e;
+      border: 1px solid #1d2a3a;
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+    }
+
+    .preview {
+      position: relative;
+      aspect-ratio: 3 / 4;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #1a2534;
+    }
+    video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    canvas#hud { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    footer { color: var(--muted); padding: 8px 14px; font-size: 12px; }
+    .badge { font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 999px; border: 1px solid #2a3b52; margin-left: 6px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
+
 <body>
+  <header>
+    <h1>Interactive Hand‑Tracked Art <span id="status" class="badge">booting…</span></h1>
+    <div class="controls">
+      <label>Dominant hand
+        <select id="handedness">
+          <option value="any">Auto</option>
+          <option value="Right">Right</option>
+          <option value="Left">Left</option>
+        </select>
+      </label>
+      <label>Hover radius
+        <input id="radius" type="range" min="10" max="120" value="48" />
+      </label>
+      <button id="shuffle">Shuffle Art</button>
+      <button id="clear">Reset</button>
+    </div>
+  </header>
+
   <div class="wrap">
-    <header>
-      <h1>HandTouch</h1>
-      <span class="pill" id="status">Loading…</span>
-      <span class="pill" id="fps">0 fps</span>
-      <span class="pill" id="handed">auto</span>
-      <div class="row" style="margin-left:auto">
-        <button class="btn" id="flip">Flip Camera</button>
-        <button class="btn" id="toggleCam" aria-pressed="true">Camera On</button>
-        <label class="btn" for="overlayToggle"><input id="overlayToggle" type="checkbox"> Landmarks</label>
-      </div>
-    </header>
+    <canvas id="art"></canvas>
 
-    <main class="stage" id="stage">
-      <video id="video" autoplay playsinline muted></video>
-      <canvas id="scene"></canvas>
-      <canvas id="overlay" class="hidden"></canvas>
-
-      <section class="toolbar" role="toolbar" aria-label="Options">
-        <div class="row">
-          <button class="btn" id="anim">Toggle Animation</button>
-          <button class="btn" id="reset">Reset</button>
-          <label class="btn" for="prefLeft">
-            <input id="prefLeft" type="radio" name="handPref" value="left"> Left
-          </label>
-          <label class="btn" for="prefRight">
-            <input id="prefRight" type="radio" name="handPref" value="right"> Right
-          </label>
-          <label class="btn" for="prefAuto">
-            <input id="prefAuto" type="radio" name="handPref" value="auto" checked> Auto
-          </label>
+    <div class="side">
+      <div class="panel">
+        <div class="preview">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="hud"></canvas>
         </div>
-      </section>
+      </div>
 
-      <aside class="legend">
-        <div style="font-weight:600; margin-bottom:6px">How to interact</div>
-        <div>• Hover fingertip over objects to highlight</div>
-        <div>• Tap (quick in/out) to trigger buttons</div>
-        <div>• Pinch near the ball to grab & drag</div>
-        <div style="margin-top:6px; color:#8ea2bf">Tip: Use Flip if your camera is mirrored.</div>
-      </aside>
-    </main>
-
-    <footer>
-      <div>On‑device hand tracking via MediaPipe Hands.</div>
-      <div id="hint">Allow camera to begin.</div>
-    </footer>
+      <div class="panel" style="display:grid; gap:6px; align-content:start;">
+        <div><strong>How it works</strong></div>
+        <div class="muted">Allow camera access. Move your hand in front of the camera. Hover over shapes with your index fingertip or palm to trigger effects. Use the dropdown to target a specific hand, if desired.</div>
+        <div class="muted">Tips: ensure good lighting; keep hand within frame. This runs entirely in your browser.</div>
+      </div>
+    </div>
   </div>
 
-  <script type="module">
-    import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs";
+  <footer>
+    <span>Model: MediaPipe Hands</span>
+    <span class="badge mono" id="perf">– ms</span>
+  </footer>
 
-    const els = {
-      video: document.getElementById('video'),
-      scene: document.getElementById('scene'),
-      overlay: document.getElementById('overlay'),
-      stage: document.getElementById('stage'),
-      status: document.getElementById('status'),
-      fps: document.getElementById('fps'),
-      hint: document.getElementById('hint'),
-      flip: document.getElementById('flip'),
-      toggleCam: document.getElementById('toggleCam'),
-      overlayToggle: document.getElementById('overlayToggle'),
-      animBtn: document.getElementById('anim'),
-      resetBtn: document.getElementById('reset'),
-      handed: document.getElementById('handed'),
-      prefLeft: document.getElementById('prefLeft'),
-      prefRight: document.getElementById('prefRight'),
-      prefAuto: document.getElementById('prefAuto'),
-    };
+  <!-- MediaPipe dependencies (served via jsDelivr CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
-    const dctx = els.scene.getContext('2d');
-    const octx = els.overlay.getContext('2d');
+  <script>
+    // --- DOM refs ---
+    const art = document.getElementById('art');
+    const ctx = art.getContext('2d');
+    const hud = document.getElementById('hud');
+    const hctx = hud.getContext('2d');
+    const video = document.getElementById('video');
+    const statusEl = document.getElementById('status');
+    const perfEl = document.getElementById('perf');
+    const radiusEl = document.getElementById('radius');
+    const handednessEl = document.getElementById('handedness');
+    const shuffleBtn = document.getElementById('shuffle');
+    const clearBtn = document.getElementById('clear');
 
-    function fitCanvases(){
-      const r = els.stage.getBoundingClientRect();
-      const dpr = Math.max(1, window.devicePixelRatio||1);
-      [els.scene, els.overlay].forEach(c=>{ c.width = Math.floor(r.width*dpr); c.height = Math.floor(r.height*dpr); c.style.width = r.width+'px'; c.style.height = r.height+'px'; });
-      dctx.setTransform(dpr,0,0,dpr,0,0);
-      octx.setTransform(dpr,0,0,dpr,0,0);
+    // --- Canvas sizing ---
+    function fitCanvasToDisplay() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const rect = art.getBoundingClientRect();
+      art.width = Math.floor(rect.width * dpr);
+      art.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const prect = hud.getBoundingClientRect();
+      hud.width = Math.floor(prect.width * dpr);
+      hud.height = Math.floor(prect.height * dpr);
+      hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    window.addEventListener('resize', fitCanvases); fitCanvases();
+    window.addEventListener('resize', fitCanvasToDisplay);
+    fitCanvasToDisplay();
 
-    // Camera
-    let stream=null; const state={ camFacing:'user', camOn:true };
-    async function startCamera(){
-      try{
-        stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:state.camFacing, width:{ideal:1280}, height:{ideal:720}}, audio:false });
-        els.video.srcObject=stream; els.hint.textContent='Point your index finger at the screen.';
-      }catch(e){ els.hint.textContent='Camera blocked. Enable it in browser settings.'; console.error(e); }
-    }
-    function stopCamera(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } els.video.srcObject=null; }
-    els.flip.onclick = async()=>{ state.camFacing = (state.camFacing==='user'?'environment':'user'); await stopCamera(); await startCamera(); };
-    els.toggleCam.onclick = async()=>{ state.camOn=!state.camOn; els.toggleCam.setAttribute('aria-pressed', String(state.camOn)); els.toggleCam.textContent=state.camOn?'Camera On':'Camera Off'; if(state.camOn) startCamera(); else stopCamera(); };
-    await startCamera();
+    // --- Art primitives ---
+    const shapes = [];
+    const palette = ['#6aa6ff','#8b5cf6','#22d3ee','#f472b6','#f59e0b','#4ade80'];
+    const rnd = (a,b)=>Math.random()*(b-a)+a;
+    const irnd = (a,b)=>Math.floor(rnd(a,b));
 
-    // MediaPipe Hands
-    els.status.textContent='Loading model…';
-    const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
-    const handLandmarker = await HandLandmarker.createFromOptions(fileset,{
-      baseOptions:{ modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" },
-      numHands:2, runningMode:'VIDEO'
-    });
-    els.status.textContent='Ready';
-
-    const LM={ WRIST:0, INDEX_TIP:8, THUMB_TIP:4 };
-    let handPref='auto'; let lastHanded='auto';
-    [els.prefLeft,els.prefRight,els.prefAuto].forEach(r=> r.addEventListener('change', ()=>{ handPref = (document.querySelector('input[name="handPref"]:checked')?.value || 'auto'); }));
-
-    function chooseHand(result){
-      const hands = result.handednesses || [];
-      if(hands.length===0) return null;
-      if(handPref==='auto') return 0; // pick first
-      for(let i=0;i<hands.length;i++){
-        const label = hands[i][0]?.categoryName?.toLowerCase();
-        if(label===handPref) return i;
+    function seedArt(count = 40) {
+      shapes.length = 0;
+      const { width: W, height: H } = art.getBoundingClientRect();
+      for (let i=0;i<count;i++) {
+        const type = Math.random()<0.4 ? 'circle' : (Math.random()<0.5?'poly':'rect');
+        const s = {
+          id: i,
+          type,
+          x: rnd(40, W-40),
+          y: rnd(40, H-40),
+          r: rnd(12, 38),
+          w: rnd(24, 86),
+          h: rnd(24, 86),
+          rot: rnd(0, Math.PI*2),
+          hue: palette[irnd(0,palette.length)],
+          baseHue: null,
+          vx: rnd(-0.3, 0.3),
+          vy: rnd(-0.3, 0.3),
+          spin: rnd(-0.02, 0.02),
+          jitter: rnd(0.5, 1.5),
+          pulse: rnd(0.8, 1.2),
+          hover: 0,
+        };
+        s.baseHue = s.hue;
+        shapes.push(s);
       }
-      return 0;
     }
 
-    // Interaction helpers
-    function normToCanvas(pt){ const r = els.scene.getBoundingClientRect(); return { x: pt.x*r.width, y: pt.y*r.height } }
-    function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy) }
-    function pinchValue(lms){ const a=lms[LM.THUMB_TIP], b=lms[LM.INDEX_TIP]; if(!a||!b) return 1; const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy) }
+    function drawShapes(dt, pointer) {
+      const { width: W, height: H } = art.getBoundingClientRect();
+      ctx.clearRect(0,0,W,H);
 
-    let fpsSmoothed=0, lastT=performance.now();
-    function updateFPS(t){ const dt=Math.max(1,t-lastT); lastT=t; const fps=1000/dt; fpsSmoothed=fpsSmoothed*0.9+fps*0.1; els.fps.textContent=fpsSmoothed.toFixed(0)+' fps'; }
-
-    // Scene objects
-    const scene={ bg:'#0c1117', targetBg:'#0c1117', anim:false, particles:[],
-      objects:[]
-    };
-
-    // Interactive objects API
-    class Obj{ constructor(type,x,y){ this.type=type; this.x=x; this.y=y; this.r=28; this.hover=false; this.pressed=false; this.color='#fff'; }
-      contains(p){ return dist(this,p) <= this.r }
-      draw(ctx){ ctx.save(); ctx.translate(this.x,this.y); if(this.type==='color'){ ctx.fillStyle=this.color; ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=this.hover? '#ffffffaa':'#00000055'; ctx.stroke(); }
-        else if(this.type==='button'){ ctx.fillStyle=this.hover?'#1e2a3d':'#162032'; roundRect(ctx,-44,-18,88,36,10); ctx.fill(); ctx.strokeStyle='#24354e'; ctx.stroke(); ctx.fillStyle='#d9e3f1'; ctx.font='600 13px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('Toggle',0,0); }
-        else if(this.type==='ball'){ ctx.fillStyle=this.color; ctx.beginPath(); ctx.arc(0,0,this.r,0,Math.PI*2); ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=this.hover? '#ffffffaa':'#00000055'; ctx.stroke(); }
-        ctx.restore(); }
-      onTap(){ /* default no-op */ }
-    }
-
-    function roundRect(ctx,x,y,w,h,r){ const rr=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr); ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath(); }
-
-    // Build scene
-    const colors=['#78e3ff','#b6ff7d','#ffd166','#ff6b6b','#c792ea','#9be7ff'];
-    colors.forEach((c,i)=>{ const o=new Obj('color', 70+i*56, 70); o.color=c; o.onTap=()=>{ scene.targetBg=c + '22'; }; scene.objects.push(o); });
-    const btn=new Obj('button', 70, 140); btn.onTap=()=>{ scene.anim=!scene.anim; }; scene.objects.push(btn);
-    const ball=new Obj('ball', 180, 140); ball.r=34; ball.color='#66d9e8'; ball.isGrabbed=false; scene.objects.push(ball);
-
-    // Particles for animation
-    function spawnParticles(n){ for(let i=0;i<n;i++){ scene.particles.push({ x:Math.random()*els.scene.width, y:Math.random()*els.scene.height, vx:(Math.random()-0.5)*1.2, vy:(Math.random()-0.5)*1.2, r:2+Math.random()*3, a:0.3+Math.random()*0.6 }); } }
-    spawnParticles(140);
-
-    // Tap detection
-    let lastTouchState=false; let lastTouchTime=0; let lastTip={x:0,y:0};
-
-    function render(){
-      // Smooth bg
-      dctx.save(); dctx.fillStyle=scene.bg; dctx.fillRect(0,0,els.scene.width,els.scene.height); dctx.restore();
-
-      // Animate bg color toward target
-      scene.bg = lerpColor(scene.bg, scene.targetBg, 0.05);
-
-      // Particles
-      if(scene.anim){
-        dctx.save(); dctx.globalAlpha=0.8; dctx.fillStyle='#ffffff05'; dctx.fillRect(0,0,els.scene.width,els.scene.height); dctx.restore();
-        dctx.save(); dctx.globalAlpha=0.7; dctx.fillStyle='#ffffff';
-        for(const p of scene.particles){ p.x+=p.vx; p.y+=p.vy; if(p.x<0||p.x>els.scene.width) p.vx*=-1; if(p.y<0||p.y>els.scene.height) p.vy*=-1; dctx.beginPath(); dctx.arc(p.x,p.y,p.r,0,Math.PI*2); dctx.globalAlpha=p.a; dctx.fill(); }
-        dctx.restore();
+      // Ambient background sparkles
+      for (let i=0;i<80;i++) {
+        const x = (i*97) % W; const y = (i*71) % H; const a = ((i*13)%100)/200 + 0.05;
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.fillRect((x + i*dt*0.02)%W, (y + i*dt*0.03)%H, 1, 1);
       }
 
-      // Objects
-      for(const o of scene.objects){ o.draw(dctx); }
+      const hoverRadius = +radiusEl.value;
 
-      requestAnimationFrame(render);
-    }
+      shapes.forEach(s => {
+        // Motion update
+        s.x += s.vx * s.jitter;
+        s.y += s.vy * s.jitter;
+        s.rot += s.spin;
+        if (s.x < 20 || s.x > W-20) s.vx *= -1;
+        if (s.y < 20 || s.y > H-20) s.vy *= -1;
 
-    function lerp(a,b,t){ return a+(b-a)*t }
-    function lerpColor(c1,c2,t){ if(!c2) return c1; const a=hexToRgbA(c1), b=hexToRgbA(c2); const r=Math.round(lerp(a[0],b[0],t)); const g=Math.round(lerp(a[1],b[1],t)); const b2=Math.round(lerp(a[2],b[2],t)); const a2=lerp(a[3],b[3],t); return `rgba(${r},${g},${b2},${a2})`; }
-    function hexToRgbA(c){ if(c.startsWith('rgba')){ const m=c.match(/rgba\((\d+),(\d+),(\d+),(.*)\)/); return [+m[1],+m[2],+m[3],+m[4]] } const ctx=document.createElement('canvas').getContext('2d'); ctx.fillStyle=c; const rgb=ctx.fillStyle; const m=rgb.match(/rgb\((\d+), (\d+), (\d+)\)/); return [+(m?.[1]||0),+(m?.[2]||0),+(m?.[3]||0),1] }
-
-    // Landmark overlay
-    function drawLandmarks(landmarks){
-      octx.clearRect(0,0,els.overlay.width,els.overlay.height);
-      if(!els.overlayToggle.checked) return;
-      octx.fillStyle='#00e0ff';
-      for(const pt of landmarks){ const p=normToCanvas(pt); octx.beginPath(); octx.arc(p.x,p.y,5,0,Math.PI*2); octx.fill(); }
-    }
-
-    // Main loop: hand tracking + hit‑testing
-    let grabbed=null; let pinchClosed=false;
-    function loop(){
-      const t=performance.now(); updateFPS(t);
-      if(els.video.readyState>=2){
-        const res = handLandmarker.detectForVideo(els.video, t);
-        const idx = chooseHand(res);
-        const lm = (idx!=null) ? res.landmarks?.[idx] : null;
-        const handedness = (idx!=null) ? res.handednesses?.[idx]?.[0]?.categoryName : null;
-        if(handedness){ lastHanded=handedness.toLowerCase(); els.handed.textContent=lastHanded; }
-
-        if(lm){
-          const tipN = lm[LM.INDEX_TIP]; const thumbN = lm[LM.THUMB_TIP];
-          const tip = normToCanvas(tipN);
-          const pv = pinchValue(lm); // normalized space [0..~]
-          const wasClosed=pinchClosed; pinchClosed = pv < 0.06; // threshold tweakable
-
-          drawLandmarks(lm);
-
-          // Hover state
-          for(const o of scene.objects){ o.hover = o.contains(tip); }
-
-          // Grab logic for ball
-          const ball = scene.objects.find(o=>o.type==='ball');
-          if(ball){
-            if(!ball.isGrabbed && pinchClosed && ball.contains(tip)) { ball.isGrabbed=true; grabbed=ball; }
-            if(ball.isGrabbed){ ball.x = tip.x; ball.y = tip.y; if(!pinchClosed){ ball.isGrabbed=false; grabbed=null; }
-            }
+        // Interaction
+        if (pointer) {
+          const dx = s.x - pointer.x;
+          const dy = s.y - pointer.y;
+          const d = Math.hypot(dx, dy);
+          const inside = d < hoverRadius + s.r;
+          s.hover = Math.max(0, Math.min(1, inside ? 1 - (d/(hoverRadius+s.r)) : s.hover*0.92));
+          if (inside) {
+            // Repel a bit
+            s.x += (dx / (d+0.0001)) * 1.8;
+            s.y += (dy / (d+0.0001)) * 1.8;
+            // Color shift + pulse
+            s.hue = '#ffffff';
+          } else {
+            s.hue = s.baseHue;
           }
-
-          // Tap detection (quick approach: transition from far->near->far within 280ms)
-          const touching = scene.objects.some(o=>o.contains(tip));
-          const now = performance.now();
-          if(touching && !lastTouchState){ lastTouchTime = now; }
-          if(!touching && lastTouchState && (now-lastTouchTime)<280){ // tap
-            const target = scene.objects.find(o=>o.contains(lastTip));
-            if(target && typeof target.onTap==='function' && !target.isGrabbed){ target.onTap(); }
-          }
-          lastTouchState = touching; lastTip = tip;
         } else {
-          octx.clearRect(0,0,els.overlay.width,els.overlay.height);
-          lastTouchState=false; pinchClosed=false; if(grabbed){ grabbed.isGrabbed=false; grabbed=null; }
+          s.hover *= 0.94;
+          s.hue = s.baseHue;
+        }
+
+        // Draw
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.rot);
+        const scale = 1 + s.hover * 0.35;
+        ctx.scale(scale, scale);
+        ctx.globalAlpha = 0.88 + s.hover*0.12;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillStyle = s.hue;
+
+        if (s.type === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, s.r, 0, Math.PI*2);
+          ctx.fill();
+          ctx.stroke();
+        } else if (s.type === 'rect') {
+          roundedRect(ctx, -s.w/2, -s.h/2, s.w, s.h, 10);
+          ctx.fill();
+          ctx.stroke();
+        } else { // poly (triangle-ish)
+          const R = s.r * 1.2;
+          ctx.beginPath();
+          for (let i=0;i<5;i++) {
+            const a = i * (Math.PI*2/5);
+            const px = Math.cos(a) * R;
+            const py = Math.sin(a) * R * (i%2?0.55:1);
+            if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+
+      // Pointer visualization
+      if (pointer) {
+        ctx.save();
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.arc(pointer.x, pointer.y, hoverRadius, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pointer.x, pointer.y, 4, 0, Math.PI*2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function roundedRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.arcTo(x+w, y, x+w, y+h, r);
+      ctx.arcTo(x+w, y+h, x, y+h, r);
+      ctx.arcTo(x, y+h, x, y, r);
+      ctx.arcTo(x, y, x+w, y, r);
+      ctx.closePath();
+    }
+
+    // --- Hand tracking via MediaPipe Hands ---
+    let latestPointer = null; // {x,y}
+    let lastStamp = performance.now();
+
+    function toCanvasCoords(normX, normY) {
+      // normX/normY are 0..1 in video space; map to hud canvas first (mirrored), then to art canvas proportionally
+      const prect = hud.getBoundingClientRect();
+      const xHud = (1 - normX) * prect.width; // mirror to match UI
+      const yHud = normY * prect.height;
+
+      const arect = art.getBoundingClientRect();
+      // Map proportionally (both canvases are same pixel ratio scaling already)
+      const xArt = xHud / prect.width * arect.width;
+      const yArt = yHud / prect.height * arect.height;
+      return { x: xArt, y: yArt };
+    }
+
+    function pickPointerFromLandmarks(result) {
+      // Prefer index fingertip if visible; else use palm center approximation
+      const lm = result.landmarks;
+      if (!lm || lm.length === 0) return null;
+      const tip = lm[8]; // index fingertip
+      if (tip && tip.visibility === undefined || tip.visibility > 0.5) {
+        return toCanvasCoords(tip.x, tip.y);
+      }
+      // Approx palm center as avg of wrist(0) + MCPs(5,9,13,17)
+      const ids = [0,5,9,13,17];
+      const mean = ids.reduce((acc, id)=>({x: acc.x+lm[id].x, y: acc.y+lm[id].y}), {x:0,y:0});
+      mean.x /= ids.length; mean.y /= ids.length;
+      return toCanvasCoords(mean.x, mean.y);
+    }
+
+    // HUD drawing of detected hands for debug
+    function drawHUD(results) {
+      const prect = hud.getBoundingClientRect();
+      hctx.clearRect(0,0,prect.width, prect.height);
+      if (!results || results.multiHandLandmarks.length === 0) return;
+      for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+        const landmarks = results.multiHandLandmarks[i];
+        window.drawConnectors(hctx, landmarks, window.HAND_CONNECTIONS, {color: 'rgba(255,255,255,0.25)'});
+        window.drawLandmarks(hctx, landmarks, {color: '#ffffff', fillColor: '#ffffff', radius: 1.5});
+      }
+    }
+
+    // Filter by handedness per user selection
+    function selectHand(results) {
+      const pref = handednessEl.value; // 'any' | 'Left' | 'Right'
+      const list = [];
+      for (let i=0; i<results.multiHandedness.length; i++) {
+        const meta = results.multiHandedness[i];
+        if (pref === 'any' || meta.label === pref) {
+          list.push({ landmarks: results.multiHandLandmarks[i], label: meta.label, score: meta.score });
         }
       }
-      requestAnimationFrame(loop);
+      return list;
     }
 
-    render();
-    requestAnimationFrame(loop);
+    // --- Main loop ---
+    let hands = null;
+    let cam = null;
 
-    els.overlayToggle.addEventListener('change',()=>{
-      els.overlay.classList.toggle('hidden', !els.overlayToggle.checked);
-    });
+    async function init() {
+      try {
+        statusEl.textContent = 'requesting camera…';
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+        video.srcObject = stream;
+      } catch (err) {
+        statusEl.textContent = 'camera blocked';
+        console.error(err);
+        alert('Camera permission is required. Please allow access and reload.');
+        return;
+      }
 
-    els.animBtn.addEventListener('click', ()=> scene.anim=!scene.anim);
-    els.resetBtn.addEventListener('click', ()=>{ scene.bg='#0c1117'; scene.targetBg='#0c1117'; scene.anim=false; const b=scene.objects.find(o=>o.type==='ball'); if(b){ b.x=180; b.y=140; } });
+      hands = new window.Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6,
+      });
 
-    const ro=new ResizeObserver(fitCanvases); ro.observe(els.stage);
+      hands.onResults((results) => {
+        // Keep a lightweight, filtered representation
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length) {
+          const picked = selectHand(results);
+          const focus = picked[0];
+          latestPointer = focus ? pickPointerFromLandmarks(focus) : null;
+        } else {
+          latestPointer = null;
+        }
+        drawHUD(results);
+      });
+
+      cam = new window.Camera(video, {
+        onFrame: async () => {
+          const t0 = performance.now();
+          await hands.send({ image: video });
+          perfEl.textContent = `${Math.round(performance.now() - t0)} ms`;
+        },
+        width: 640,
+        height: 480,
+      });
+      cam.start();
+
+      statusEl.textContent = 'live';
+      seedArt();
+      requestAnimationFrame(tick);
+    }
+
+    function tick(now) {
+      const dt = Math.min(33, now - lastStamp); // cap delta for stability
+      lastStamp = now;
+      drawShapes(dt, latestPointer);
+      requestAnimationFrame(tick);
+    }
+
+    // --- UI wiring ---
+    shuffleBtn.addEventListener('click', () => seedArt(irnd(30, 70)));
+    clearBtn.addEventListener('click', () => seedArt());
+
+    // Kick things off
+    init();
   </script>
 </body>
 </html>
