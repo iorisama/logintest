@@ -1,135 +1,354 @@
 <!DOCTYPE html>
-<html lang="en-us">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>METASMESTA</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-  </head>
-  <body class="dark">
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas"></canvas>
-      <div id="unity-custom-loading-screen">
-        <div id="custom-logo"></div>
-        <div id="custom-loader">
-          <div class="fill"></div>
-          <div class="label"></div>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hand-Draw — Camera Hand Tracking Canvas</title>
+  <style>
+    :root{
+      --bg:#0b0d10; --panel:#111418; --ink:#e7eaee; --muted:#7c8698; --accent:#4cc9f0;
+      --card:#0f1318; --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; background:linear-gradient(180deg,var(--bg),#0f1216); color:var(--ink); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;}
+
+    .wrap{display:grid; grid-template-rows:auto 1fr auto; height:100vh;}
+    header{display:flex; align-items:center; gap:.6rem; padding:.6rem .8rem; background:rgba(0,0,0,.25); backdrop-filter:saturate(1.2) blur(6px); border-bottom:1px solid #1b212a;}
+    header h1{font-size:14px; font-weight:600; letter-spacing:.4px; margin:0; color:#dbe1ea}
+    header .pill{padding:.22rem .5rem; border:1px solid #253041; border-radius:999px; color:var(--muted)}
+
+    .stage{position:relative; display:grid; place-items:center; overflow:hidden;}
+    .video, .overlay, #draw{position:absolute; inset:0; width:100%; height:100%;}
+    video{object-fit:cover; filter:brightness(.95) contrast(1.05) saturate(1.05)}
+    canvas{display:block}
+
+    .toolbar{position:absolute; left:12px; top:12px; display:flex; gap:8px; flex-wrap:wrap; background:var(--panel); border:1px solid #1b2230; padding:10px; border-radius:14px; box-shadow:var(--shadow)}
+    .btn{appearance:none; border:1px solid #253041; background:#121720; color:#d7dde7; padding:8px 10px; border-radius:10px; cursor:pointer; transition:transform .08s ease, background .15s ease, border .15s ease}
+    .btn:hover{transform:translateY(-1px)}
+    .btn[aria-pressed="true"]{background:#162033; border-color:#2a3a56}
+    .swatch{width:24px; height:24px; border-radius:999px; border:2px solid rgba(255,255,255,.65); cursor:pointer}
+    .colors{display:flex; gap:8px; align-items:center}
+    .row{display:flex; gap:8px; align-items:center}
+    .slider{accent-color:var(--accent)}
+
+    .legend{position:absolute; right:12px; bottom:12px; background:var(--panel); border:1px solid #1b2230; padding:10px 12px; border-radius:12px; color:#c7cfdb; max-width:min(420px, 56vw); box-shadow:var(--shadow);}
+    .legend b{color:#eaf1ff}
+    .landmark{position:absolute; width:10px; height:10px; border-radius:50%; background:#00e0ff55; border:2px solid #00e0ff; pointer-events:none}
+
+    footer{display:flex; justify-content:space-between; align-items:center; padding:.5rem .8rem; color:#97a3b7; background:rgba(0,0,0,.25); border-top:1px solid #1b212a}
+    footer a{color:#b8c4d9}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Hand‑Draw</h1>
+      <span class="pill" id="status">Loading model…</span>
+      <span class="pill" id="fps">0 fps</span>
+      <div style="margin-left:auto" class="row">
+        <button class="btn" id="flip">Flip Camera</button>
+        <button class="btn" id="toggleCam" aria-pressed="true">Camera On</button>
+      </div>
+    </header>
+
+    <main class="stage" id="stage">
+      <video id="video" class="video" autoplay playsinline muted></video>
+      <!-- Drawing canvas -->
+      <canvas id="draw"></canvas>
+      <!-- Optional overlay for landmarks (debug) -->
+      <canvas id="overlay" class="overlay hidden"></canvas>
+
+      <section class="toolbar" role="toolbar" aria-label="Tools">
+        <div class="row">
+          <button class="btn" id="toolPen" aria-pressed="true">Pen</button>
+          <button class="btn" id="toolEraser" aria-pressed="false">Eraser</button>
+          <button class="btn" id="undo">Undo</button>
+          <button class="btn" id="clear">Clear</button>
+          <label class="btn" for="showOverlay">
+            <input type="checkbox" id="showOverlay" /> Landmarks
+          </label>
         </div>
-      </div>      
-    </div>
-    <div id="unity-fullscreen-button" style="display: none;"></div>
-    <script>
-      var container = document.querySelector("#unity-container");
-      var canvas = document.querySelector("#unity-canvas");
-      var loadingScreen = document.querySelector("#unity-custom-loading-screen");
-      var customLoadingBar = document.querySelector("#custom-loader");
-      var fullscreenButton = document.querySelector("#unity-fullscreen-button");
-      var warningBanner = document.querySelector("#unity-warning");;
+        <div class="row">
+          <label style="display:flex; align-items:center; gap:8px; background:#121720; border:1px solid #253041; padding:6px 8px; border-radius:10px;">
+            <span style="color:#9aabc2">Brush</span>
+            <input id="size" type="range" min="2" max="40" value="8" class="slider" />
+            <span id="sizeVal">8</span>
+          </label>
+        </div>
+        <div class="colors" id="colors"></div>
+      </section>
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+      <aside class="legend" id="legend">
+        <div style="font-weight:600; margin-bottom:6px">Gesture Cheatsheet</div>
+        <div>• <b>Pinch</b> (thumb + index) = draw</div>
+        <div>• <b>Release</b> = lift pen</div>
+        <div>• <b>Long‑pinch</b> (≥1s) = toggle eraser</div>
+        <div>• <b>Double‑pinch</b> = undo</div>
+        <div style="margin-top:6px; color:#8ea2bf">Tip: Use the toolbar any time if gestures are fussy.</div>
+      </aside>
+    </main>
+
+    <footer>
+      <div>Built with MediaPipe Hands. Your video stays on‑device.</div>
+      <div id="hint">Grant camera permission to begin.</div>
+    </footer>
+  </div>
+
+  <script type="module">
+    // --- MediaPipe Tasks: Hand Landmarker ---
+    import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs";
+
+    const els = {
+      video: document.getElementById('video'),
+      draw: document.getElementById('draw'),
+      overlay: document.getElementById('overlay'),
+      stage: document.getElementById('stage'),
+      status: document.getElementById('status'),
+      fps: document.getElementById('fps'),
+      flip: document.getElementById('flip'),
+      toggleCam: document.getElementById('toggleCam'),
+      toolPen: document.getElementById('toolPen'),
+      toolEraser: document.getElementById('toolEraser'),
+      undo: document.getElementById('undo'),
+      clear: document.getElementById('clear'),
+      size: document.getElementById('size'),
+      sizeVal: document.getElementById('sizeVal'),
+      colors: document.getElementById('colors'),
+      showOverlay: document.getElementById('showOverlay'),
+      hint: document.getElementById('hint'),
+      legend: document.getElementById('legend'),
+    };
+
+    // UI colors
+    const PALETTE = ['#ffffff','#000000','#ff4757','#ffa502','#2ed573','#1e90ff','#9b59b6','#2f3542','#f1c40f','#ff6b81'];
+
+    // State
+    const state = {
+      color: '#ffffff',
+      size: 8,
+      erasing: false,
+      strokes: [], // list of {points:[{x,y}], color, size, erasing}
+      currentStroke: null,
+      camFacing: 'user',
+      camOn: true,
+      drawing: false,
+      lastPinchTime: 0,
+      pinchHistory: [],
+      longPinchTimer: null,
+    };
+
+    // Setup UI
+    els.size.addEventListener('input', (e)=>{
+      state.size = +e.target.value; els.sizeVal.textContent = e.target.value;
+    });
+
+    function setTool(erasing){
+      state.erasing = !!erasing;
+      els.toolPen.setAttribute('aria-pressed', String(!erasing));
+      els.toolEraser.setAttribute('aria-pressed', String(!!erasing));
+    }
+    els.toolPen.onclick = ()=> setTool(false);
+    els.toolEraser.onclick = ()=> setTool(true);
+
+    els.undo.onclick = ()=>{ if(state.strokes.length){ state.strokes.pop(); redrawAll(); }};
+    els.clear.onclick = ()=>{ state.strokes.length=0; clearCanvas(dctx); clearCanvas(octx); };
+
+    els.showOverlay.addEventListener('change', (e)=>{
+      els.overlay.classList.toggle('hidden', !e.target.checked);
+    });
+
+    // Color swatches
+    for(const c of PALETTE){
+      const sw = document.createElement('button');
+      sw.className = 'swatch'; sw.style.background = c; sw.title = c;
+      sw.addEventListener('click', ()=> { state.color = c; highlightSwatch(c); });
+      els.colors.appendChild(sw);
+    }
+    function highlightSwatch(c){
+      els.colors.querySelectorAll('.swatch').forEach(el=>{
+        el.style.outline = (el.style.backgroundColor === toRGB(c)) ? '2px solid var(--accent)' : 'none';
+      });
+    }
+    function toRGB(hex){
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.fillStyle = hex; return ctx.fillStyle; // returns rgb(...) string
+    }
+    highlightSwatch(state.color);
+
+    // Canvas contexts
+    const dctx = els.draw.getContext('2d', { alpha: true }); // drawing
+    const octx = els.overlay.getContext('2d'); // landmarks
+
+    // Resize canvases to match element size / DPR
+    function fitCanvases(){
+      const r = els.stage.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      [els.draw, els.overlay].forEach(c=>{ c.width = Math.floor(r.width * dpr); c.height = Math.floor(r.height * dpr); c.style.width = r.width + 'px'; c.style.height = r.height + 'px'; });
+      dctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
+      octx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    window.addEventListener('resize', fitCanvases);
+    fitCanvases();
+
+    function clearCanvas(ctx){ ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height); ctx.restore(); }
+
+    function redrawAll(){
+      clearCanvas(dctx);
+      for(const s of state.strokes){ drawStroke(dctx, s); }
+    }
+
+    function drawStroke(ctx, s){
+      if(!s.points.length) return;
+      ctx.save();
+      if(s.erasing){ ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = 'rgba(0,0,0,1)'; }
+      else{ ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = s.color; }
+      ctx.lineWidth = s.size; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(s.points[0].x, s.points[0].y);
+      for(let i=1;i<s.points.length;i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Camera handling
+    let stream = null;
+    async function startCamera(){
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.camFacing, width: {ideal:1280}, height:{ideal:720} }, audio:false });
+        els.video.srcObject = stream; els.hint.textContent = 'Pinch to draw';
+      }catch(err){
+        els.hint.textContent = 'Camera blocked. Please enable it.'; console.error(err);
+      }
+    }
+    async function stopCamera(){
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+      els.video.srcObject = null;
+    }
+    els.flip.onclick = async ()=>{ state.camFacing = (state.camFacing==='user'?'environment':'user'); await stopCamera(); await startCamera(); };
+    els.toggleCam.onclick = async ()=>{ state.camOn = !state.camOn; els.toggleCam.setAttribute('aria-pressed', String(state.camOn)); els.toggleCam.textContent = state.camOn? 'Camera On':'Camera Off'; if(state.camOn) startCamera(); else stopCamera(); };
+
+    await startCamera();
+
+    // Load model
+    els.status.textContent = 'Loading model…';
+    const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
+    const handLandmarker = await HandLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" },
+      numHands: 1,
+      runningMode: 'VIDEO'
+    });
+    els.status.textContent = 'Ready';
+
+    // Gesture helpers
+    const LM = { THUMB_TIP:4, INDEX_TIP:8, INDEX_PIP:6, MIDDLE_TIP:12, RING_TIP:16, PINKY_TIP:20, WRIST:0 };
+
+    function normToCanvas(pt){ // pt in [0,1]
+      const rect = els.draw.getBoundingClientRect();
+      return { x: pt.x * rect.width, y: pt.y * rect.height };
+    }
+
+    function pinchMetric(landmarks){
+      const a = landmarks[LM.THUMB_TIP], b = landmarks[LM.INDEX_TIP];
+      if(!a||!b) return Infinity;
+      const dx = a.x - b.x, dy = a.y - b.y; // normalized space
+      return Math.hypot(dx, dy); // smaller = closer
+    }
+
+    // FPS tracking
+    let lastT = performance.now(); let fpsSmoothed = 0;
+    function updateFPS(t){ const dt = Math.max(1, t-lastT); lastT = t; const fps = 1000/dt; fpsSmoothed = fpsSmoothed*0.9 + fps*0.1; els.fps.textContent = fpsSmoothed.toFixed(0)+" fps"; }
+
+    // Main render loop
+    const videoEl = els.video;
+    const overlay = els.overlay; const landmarksCtx = octx;
+
+    function startStroke(x,y){
+      state.currentStroke = { points:[{x,y}], color: state.color, size: state.size, erasing: state.erasing };
+      state.strokes.push(state.currentStroke);
+    }
+    function addPoint(x,y){ if(state.currentStroke) state.currentStroke.points.push({x,y}); }
+    function endStroke(){ state.currentStroke = null; }
+
+    let lastPinchWasClosed = false; let lastPinchChangeAt = 0;
+
+    function processGestures(landmarks){
+      const p = pinchMetric(landmarks);
+      const PINCH_ON = 0.06; // tune threshold (normalized)
+      const PINCH_OFF = 0.075;
+
+      const isClosed = p < PINCH_ON;
+      const isOpen = p > PINCH_OFF;
+
+      const now = performance.now();
+
+      // Double‑pinch detection
+      if(isClosed && !lastPinchWasClosed){
+        state.pinchHistory.push(now);
+        state.pinchHistory = state.pinchHistory.filter(t=> now - t < 450); // 450ms window
+        if(state.pinchHistory.length >=2){ // double pinch
+          state.pinchHistory.length=0; // reset
+          if(state.strokes.length){ state.strokes.pop(); redrawAll(); }
         }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
-        }
-        updateBannerVisibility();
+        // Start long‑pinch timer
+        clearTimeout(state.longPinchTimer);
+        state.longPinchTimer = setTimeout(()=>{ setTool(!state.erasing); }, 1000);
+      }
+      if(isOpen && lastPinchWasClosed){
+        clearTimeout(state.longPinchTimer);
       }
 
-      var hideFullScreenButton = "";
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/MPmetasmesta.loader.js";
-      var config = {
-        dataUrl: buildUrl + "/MPmetasmesta.data.unityweb",
-        frameworkUrl: buildUrl + "/MPmetasmesta.framework.js.unityweb",
-        codeUrl: buildUrl + "/MPmetasmesta.wasm.unityweb",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "Cebirra",
-        productName: "METASMESTA",
-        productVersion: "0.2",
-      };
+      lastPinchWasClosed = isClosed;
 
-      // By default Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
-      var canFullscreen = (function() {
-        for (var key of [
-            'exitFullscreen',
-            'webkitExitFullscreen',
-            'webkitCancelFullScreen',
-            'mozCancelFullScreen',
-            'msExitFullscreen',
-          ]) {
-          if (key in document) {
-            return true;
+      // Drawing state transitions (hysteresis)
+      if(!state.drawing && isClosed){ state.drawing = true; lastPinchChangeAt = now; }
+      else if(state.drawing && isOpen){ state.drawing = false; lastPinchChangeAt = now; endStroke(); }
+    }
+
+    function drawLandmarks(landmarks){
+      clearCanvas(landmarksCtx);
+      landmarksCtx.fillStyle = '#00e0ff';
+      landmarks.forEach(pt=>{
+        const p = normToCanvas(pt); landmarksCtx.beginPath(); landmarksCtx.arc(p.x, p.y, 5, 0, Math.PI*2); landmarksCtx.fill();
+      });
+    }
+
+    function loop(){
+      const t = performance.now();
+      updateFPS(t);
+      if(videoEl.readyState >= 2){
+        const res = handLandmarker.detectForVideo(videoEl, t);
+        const hands = res?.landmarks?.[0];
+        if(hands){
+          processGestures(hands);
+          if(els.showOverlay.checked){ drawLandmarks(hands); }
+          // Drawing with index tip position
+          const tip = hands[LM.INDEX_TIP];
+          if(tip){
+            const p = normToCanvas(tip);
+            if(state.drawing && !state.currentStroke) startStroke(p.x, p.y);
+            else if(state.drawing) { addPoint(p.x, p.y); drawStroke(dctx, { ...state.currentStroke, points: state.currentStroke.points.slice(-2) }); }
           }
+        } else {
+          clearCanvas(octx);
+          if(state.drawing){ state.drawing=false; endStroke(); }
         }
-        return false;
-      }());
-
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        container.className = "unity-mobile";
-        config.devicePixelRatio = 1;
       }
-      loadingScreen.style.display = "";
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
 
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          unitySetLoaderProgressTo(progress);
-        }).then((unityInstance) => {
-          loadingScreen.style.display = "none";
-          if (canFullscreen) {
-            if (!hideFullScreenButton) {
-              fullscreenButton.style.display = "";
-            }
-            fullscreenButton.onclick = () => {
-              unityInstance.SetFullscreen(1);
-            };
-          }
-        }).catch((message) => {
-          alert(message);
-        });
-      };
-      document.body.appendChild(script);
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if(e.key==='e'){ setTool(true); }
+      if(e.key==='p'){ setTool(false); }
+      if(e.key==='z' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(state.strokes.length){ state.strokes.pop(); redrawAll(); } }
+      if(e.key==='c' && (e.ctrlKey||e.metaKey)){ state.strokes.length=0; clearCanvas(dctx); }
+    });
 
-      // value - 0 to 1
-      function unitySetLoaderProgressTo(value)
-      {
-        const fill = customLoadingBar.getElementsByClassName("fill")[0];
-        const fillText = customLoadingBar.getElementsByClassName("label")[0];
-
-        fill.animate(
-          [
-            { width: (value * 100) + "%" }
-          ],
-          {
-            duration: 300,
-            fill: "forwards"
-          }
-        );
-
-        fillText.textContent = (value * 100).toFixed() + "%";
-      }
-    </script>
-  </body>
+    // Ensure canvases fit video aspect
+    const ro = new ResizeObserver(fitCanvases); ro.observe(els.stage);
+  </script>
+</body>
 </html>
